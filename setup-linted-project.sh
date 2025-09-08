@@ -35,18 +35,19 @@ npm install --save-dev --save-exact \
     stylelint-value-no-unknown-custom-properties stylelint-order
 
 npx @biomejs/biome init >/dev/null
-curl -L https://gist.githubusercontent.com/philsinatra/910c20ec4d5ffb16ad97350839a6c664/raw/a3816b2a5bf22a86cd800aea7d5fd136d9703cc8/biome.json -o biome.json
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/7b19b34dbd94052981b19b8308fdd7623e91a47c/.htmlhintrc -o .htmlhintrc
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/7b19b34dbd94052981b19b8308fdd7623e91a47c/.stylelintrc.json -o .stylelintrc.json
-curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/ee35f840da741bd28c89e2a1bb98f4460e4ecf72/css-starter.css -o styles.css
+curl -L https://gist.githubusercontent.com/philsinatra/910c20ec4d5ffb16ad97350839a6c664/raw/biome.json -o biome.json
+curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
+curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
+curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css
+-o styles.css
 
 read -p "🐘 Include PHP config? [Y/n] " response
 response=${response:-Y}
 
 if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/7b19b34dbd94052981b19b8308fdd7623e91a47c/.php-cs-fixer.php -o .php-cs-fixer.php
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/7b19b34dbd94052981b19b8308fdd7623e91a47c/phpcs.xml -o phpcs.xml
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/bfc29eca7a9fd81514804f58c744bc2a5294c9af/composer.json -o composer.json
+    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/php-cs-fixer.php -o .php-cs-fixer.php
+    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/phpcs.xml -o phpcs.xml
+    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/composer.json -o composer.json
 
     if ! command -v composer &>/dev/null; then
         echo "❌ Composer is not installed"
@@ -56,13 +57,13 @@ if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
     fi
 fi
 
-read -p "Create & open project in VSCode? [Y/n] " response
-response=${response:-Y}
+read -p "Create & open project in VSCode? [y/N] " response
+response=${response:-N}
 
 if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
     vscode_workspace_file="$project_name.code-workspace"
     echo "🔧 Creating VSCode workspace file: $vscode_workspace_file"
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/7b19b34dbd94052981b19b8308fdd7623e91a47c/project.code-workspace
+    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/project.code-workspace
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
         open "$vscode_workspace_file" 2>/dev/null || echo "⚠️ Could not open VSCode workspace (macOS-specific command)"
