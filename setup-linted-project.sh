@@ -11,7 +11,7 @@ npm_version=$(npm -v 2>/dev/null) || {
     exit 1
 }
 initial_pwd=$(pwd)
-project_pwd="$HOME/Desktop"
+project_pwd="$HOME/z-tmp"
 project_name="my_project"
 
 if [ -d "$project_pwd/$project_name" ]; then
@@ -39,6 +39,15 @@ curl -L https://gist.githubusercontent.com/philsinatra/910c20ec4d5ffb16ad9735083
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
 curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o styles.css
+
+if jq . .stylelintrc.json >/dev/null 2>&1; then
+    jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./styles.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json""
+else
+    echo "Error: .stylelintrc.json is not valie JSON"
+    exit 1
+fi
+
+touch .git
 
 read -p "🐘 Include PHP config? [Y/n] " response
 response=${response:-Y}
