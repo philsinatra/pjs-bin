@@ -47,7 +47,7 @@ else
     exit 1
 fi
 
-touch .git
+git init
 
 read -p "🐘 Include PHP config? [Y/n] " response
 response=${response:-Y}

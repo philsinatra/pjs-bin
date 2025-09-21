@@ -36,7 +36,7 @@ curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d44083186974
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
 curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o ./src/lib/screen.css
 
-touch .git
+git init
 
 if jq . .stylelintrc.json >/dev/null 2>&1; then
     jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./src/lib/screen.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json""
