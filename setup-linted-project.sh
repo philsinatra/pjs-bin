@@ -57,6 +57,8 @@ if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
     curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/phpcs.xml -o phpcs.xml
     curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/composer.json -o composer.json
 
+    mv index.html index.php
+
     if ! command -v composer &>/dev/null; then
         echo "❌ Composer is not installed"
         echo "Visit https://getcomposer.org/download/ for installation instructions"
