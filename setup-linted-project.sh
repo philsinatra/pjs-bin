@@ -28,14 +28,14 @@ touch index.html main.js
 
 npm init -y >/dev/null
 npm install --save-dev --save-exact \
-    @biomejs/biome \
+    oxlint prettier \
     postcss postcss-html \
     stylelint stylelint-config-html stylelint-config-recommended \
     stylelint-config-standard stylelint-config-alphabetical-order \
     stylelint-value-no-unknown-custom-properties stylelint-order
 
-npx @biomejs/biome init >/dev/null
-curl -L https://gist.githubusercontent.com/philsinatra/910c20ec4d5ffb16ad97350839a6c664/raw/biome.json -o biome.json
+curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/oxlintrc.json -o oxlintrc.json
+curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.prettierrc -o .prettierrc
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
 curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o styles.css
