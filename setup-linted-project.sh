@@ -14,6 +14,9 @@ initial_pwd=$(pwd)
 project_pwd="$HOME/z-tmp"
 project_name="my_project"
 
+read -p "🎨 Formatter: Prettier or Oxfmt? [p/O] " fmt_response
+fmt_response=${fmt_response:-O}
+
 if [ -d "$project_pwd/$project_name" ]; then
     echo "🚫 Project directory $project_pwd/$project_name already exists."
     exit 1
@@ -27,18 +30,41 @@ cd "$project_pwd/$project_name" || {
 touch index.html main.js
 
 npm init -y >/dev/null
-npm install --save-dev --save-exact \
-    oxlint prettier \
-    postcss postcss-html \
-    stylelint stylelint-config-html stylelint-config-recommended \
-    stylelint-config-standard stylelint-config-alphabetical-order \
-    stylelint-value-no-unknown-custom-properties stylelint-order
+if [[ ${fmt_response:0:1} =~ ^[Pp]$ ]]; then
+    npm install --save-dev --save-exact \
+        prettier \
+        oxlint \
+        postcss postcss-html \
+        stylelint stylelint-config-html stylelint-config-recommended \
+        stylelint-config-standard stylelint-config-alphabetical-order \
+        stylelint-value-no-unknown-custom-properties stylelint-order
+else
+    npm install --save-dev --save-exact \
+        oxfmt \
+        oxlint \
+        lint-staged \
+        postcss postcss-html \
+        stylelint stylelint-config-html stylelint-config-recommended \
+        stylelint-config-standard stylelint-config-alphabetical-order \
+        stylelint-value-no-unknown-custom-properties stylelint-order
+fi
 
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/oxlintrc.json -o oxlintrc.json
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.prettierrc -o .prettierrc
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
 curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o styles.css
+
+if [[ ${fmt_response:0:1} =~ ^[Pp]$ ]]; then
+    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.prettierrc -o .prettierrc
+else
+    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.oxfmtrc.json -o .oxfmtrc.json
+fi
+
+if [[ ${fmt_response:0:1} =~ ^[Oo]$ ]]; then
+    npm pkg set scripts.format="oxfmt"
+    npm pkg set scripts.format:check="oxfmt --check"
+    jq '. + {"lint-staged": {"*": "oxfmt --no-error-on-unmatched-pattern"}}' package.json > temp.json && mv temp.json package.json
+fi
 
 if jq . .stylelintrc.json >/dev/null 2>&1; then
     jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./styles.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json""
@@ -82,7 +108,7 @@ if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
     fi
 fi
 
-echo "Project setup complete: $project_pwd/$projct_name"
+echo "Project setup complete: $project_pwd/$project_name"
 cd "$initial_pwd" || {
     echo "🚫 Failed to return to $initial_pwd"
     exit 1
