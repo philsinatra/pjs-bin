@@ -49,7 +49,7 @@ else
         stylelint-value-no-unknown-custom-properties stylelint-order
 fi
 
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/oxlintrc.json -o oxlintrc.json
+curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/oxlintrc.json -o .oxlintrc.json
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
 curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
 curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o styles.css
@@ -63,7 +63,7 @@ fi
 if [[ ${fmt_response:0:1} =~ ^[Oo]$ ]]; then
     npm pkg set scripts.format="oxfmt"
     npm pkg set scripts.format:check="oxfmt --check"
-    jq '. + {"lint-staged": {"*": "oxfmt --no-error-on-unmatched-pattern"}}' package.json > temp.json && mv temp.json package.json
+    jq '. + {"lint-staged": {"*": "oxfmt --no-error-on-unmatched-pattern"}}' package.json >temp.json && mv temp.json package.json
 fi
 
 if jq . .stylelintrc.json >/dev/null 2>&1; then

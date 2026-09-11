@@ -3,3 +3,5 @@ node_modules
 .DS_Store
 vendor
 dist
+elio-omarchy-theme-install.sh
+elio-omarchy-theme-uninstall.sh
