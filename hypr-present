@@ -1,0 +1,374 @@
+#!/usr/bin/env bash
+# hypr-present -- build and apply a presenting layout as a hyprmoncfg profile.
+#
+# Shape it sets up:
+#   * laptop panel  -- the thing being mirrored
+#   * one external  -- MIRRORS the laptop (the projector / room screen)
+#   * one external  -- EXTENDED second desktop, sitting in front of the laptop
+#                      (i.e. above it in screen coordinates)
+#
+#  hypr-present --name room-a            # interactive: asks which display is the projector
+#  hypr-present --name room-a --dry-run  # see the layout, change nothing
+#  hypr-present --reset                  # back to your best-matching saved profile
+#  hypr-present --list
+#
+# Why a profile and not `hyprctl keyword`: Omarchy's Lua config uses the
+# non-legacy parser, so `hyprctl keyword` is refused outright. hyprmoncfg's
+# generated rules also load last and override anything else. Profiles are the
+# only thing that sticks.
+#
+# Re-runnable. Give each room its own --name; hyprmoncfg keys profiles on EDID
+# identity, so returning to a room auto-matches the profile saved there.
+#
+# Invoke: ~/Developer/bin/hypr-present
+
+set -uo pipefail
+
+PROFILES="$HOME/.config/hyprmoncfg/profiles"
+INTERNAL_RE='^(eDP|LVDS|DSI)-'
+
+die() {
+    echo "hypr-present: $*" >&2
+    exit 1
+}
+
+usage() {
+    cat <<'USAGE'
+hypr-present -- presenting layout: one external mirrors the laptop,
+                one external is an extended desktop.
+
+Usage:
+  hypr-present --name <room>  [options]
+  hypr-present --list
+  hypr-present --reset
+
+Options:
+  --name NAME         Profile to create or update. Use one per room.
+  --mirror CONN       External that mirrors the laptop (else you are asked).
+  --desktop CONN      External used as the second desktop (else you are asked).
+  --panel-mode MODE   Laptop mode while mirroring: 16x9 (default) | native
+  --panel-scale N     Laptop scale (default 1.5)
+  --desktop-scale N   Second desktop scale (default: auto from its width)
+  --position POS      Where the desktop sits: above (default) | below | left | right
+  --force             Overwrite an existing profile without asking
+  --dry-run           Print the layout and profile JSON; change nothing
+  --list              Show current monitors and saved profiles, then exit
+  --reset             Re-apply the best-matching saved profile, then exit
+  -h, --help
+
+Notes:
+  * The lid must be OPEN -- there is no internal panel to mirror otherwise.
+  * 16x9 switches the panel to 1920x1080 so a 16:9 projector is filled edge to
+    edge. The panel is natively 3:2, so 'native' letterboxes with side bars.
+USAGE
+}
+
+# Snap to a scale that yields whole logical pixels (same algorithm Omarchy uses).
+clean_scale() {
+    awk -v scale="$1" -v width="$2" -v height="$3" '
+    function gcd(a, b, t) { while (b) { t = a % b; a = b; b = t } return a }
+    BEGIN {
+      g = gcd(width * 120, height * 120)
+      k = int(scale * 120 + 0.5)
+      if (k < 1) k = 1
+      if (k > g) k = g
+      while (g % k != 0) k++
+      printf "%g\n", k / 120
+    }'
+}
+
+auto_scale() {
+    local w=$1
+    if ((w >= 3840)); then
+        echo 2
+    elif ((w >= 2560)); then
+        echo 1.25
+    else
+        echo 1
+    fi
+}
+
+name="" mirror="" desktop="" panel_mode="16x9" panel_scale="1.5"
+desktop_scale="" position="above" force=0 do_list=0 do_reset=0 dry_run=0
+
+while (($#)); do
+    case "$1" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    --name)
+        name="${2:-}"
+        shift 2
+        ;;
+    --mirror)
+        mirror="${2:-}"
+        shift 2
+        ;;
+    --desktop)
+        desktop="${2:-}"
+        shift 2
+        ;;
+    --panel-mode)
+        panel_mode="${2:-}"
+        shift 2
+        ;;
+    --panel-scale)
+        panel_scale="${2:-}"
+        shift 2
+        ;;
+    --desktop-scale)
+        desktop_scale="${2:-}"
+        shift 2
+        ;;
+    --position)
+        position="${2:-}"
+        shift 2
+        ;;
+    --force)
+        force=1
+        shift
+        ;;
+    --dry-run)
+        dry_run=1
+        shift
+        ;;
+    --list)
+        do_list=1
+        shift
+        ;;
+    --reset)
+        do_reset=1
+        shift
+        ;;
+    *) die "unknown argument: $1" ;;
+    esac
+done
+
+command -v jq >/dev/null || die "jq is not installed"
+[[ -d $PROFILES ]] || die "no hyprmoncfg profiles directory at $PROFILES"
+
+# HYPR_PRESENT_MONITORS lets a dry run work from a captured monitor list
+# instead of the live compositor, so a layout can be checked off-site.
+if [[ -n ${HYPR_PRESENT_MONITORS:-} && -r ${HYPR_PRESENT_MONITORS:-} ]]; then
+    mons=$(cat "$HYPR_PRESENT_MONITORS")
+else
+    mons=$(hyprctl monitors all -j) || die "cannot talk to Hyprland"
+fi
+
+if ((do_list)); then
+    echo "Monitors:"
+    jq -r '.[] | "  \(.name)  \(.description)  \(.width)x\(.height)  disabled=\(.disabled)"' <<<"$mons"
+    echo "Profiles:"
+    hyprmoncfg profiles
+    exit 0
+fi
+
+if ((do_reset)); then
+    target=$(hyprmoncfg status --json 2>/dev/null | jq -r '.recommended_profile.name // ""')
+    [[ -n $target ]] || die "no profile recommended; pick one with: hyprmoncfg apply <name>"
+    hyprmoncfg apply "$target" --confirm-timeout 0 >/dev/null 2>&1 &&
+        echo "reset to profile '$target'" || die "failed to apply '$target'"
+    exit 0
+fi
+
+[[ -n $name ]] || die "a profile name is required: --name <room>"
+[[ $name =~ ^[A-Za-z0-9._-]+$ ]] || die "profile name must be alphanumeric/dash/dot/underscore"
+case "$position" in above | below | left | right) ;; *) die "--position must be above|below|left|right" ;; esac
+case "$panel_mode" in 16x9 | native) ;; *) die "--panel-mode must be 16x9 or native" ;; esac
+
+# --- identify the panel and the externals -----------------------------------
+
+internal=$(jq -r --arg re "$INTERNAL_RE" \
+    'first(.[] | select(.name|test($re)) | select(.disabled|not) | .name) // ""' <<<"$mons")
+[[ -n $internal ]] || die "the internal panel is not enabled -- open the lid first; there is nothing to mirror"
+
+mapfile -t externals < <(jq -r --arg re "$INTERNAL_RE" \
+    '.[] | select(.name|test($re)|not) | select(.disabled|not) | .name' <<<"$mons")
+
+((${#externals[@]} >= 2)) || die "need two enabled external displays, found ${#externals[@]}. Plug both in, then re-run."
+
+pick() {
+    local prompt="$1" chosen
+    echo "$prompt" >&2
+    local i=1
+    for e in "${externals[@]}"; do
+        printf '  %d) %s  %s\n' "$i" "$e" \
+            "$(jq -r --arg n "$e" '.[]|select(.name==$n)|"\(.description) \(.width)x\(.height)"' <<<"$mons")" >&2
+        ((i++))
+    done
+    read -rp "  choice [1-${#externals[@]}]: " chosen
+    [[ $chosen =~ ^[0-9]+$ ]] && ((chosen >= 1 && chosen <= ${#externals[@]})) ||
+        die "invalid choice"
+    echo "${externals[$((chosen - 1))]}"
+}
+
+[[ -n $mirror ]] || mirror=$(pick "Which display MIRRORS the laptop (the projector / room screen)?")
+if [[ -z $desktop ]]; then
+    remaining=()
+    for e in "${externals[@]}"; do [[ $e != "$mirror" ]] && remaining+=("$e"); done
+    if ((${#remaining[@]} == 1)); then
+        desktop="${remaining[0]}"
+    else
+        externals=("${remaining[@]}")
+        desktop=$(pick "Which display is the extended second desktop?")
+    fi
+fi
+
+[[ $mirror != "$desktop" ]] || die "mirror and desktop cannot be the same display"
+for c in "$mirror" "$desktop"; do
+    jq -e --arg n "$c" 'any(.[]; .name == $n)' <<<"$mons" >/dev/null || die "no such monitor: $c"
+done
+
+# --- geometry ----------------------------------------------------------------
+
+read -r pw ph <<<"$(jq -r --arg n "$internal" '.[]|select(.name==$n)|"\(.width) \(.height)"' <<<"$mons")"
+if [[ $panel_mode == 16x9 ]]; then
+    if jq -e --arg n "$internal" '.[]|select(.name==$n)|.availableModes|any(startswith("1920x1080"))' <<<"$mons" >/dev/null; then
+        prate=$(jq -r --arg n "$internal" '.[]|select(.name==$n)|.availableModes[]|select(startswith("1920x1080"))' <<<"$mons" |
+            head -1 | sed -E 's/.*@([0-9.]+)Hz/\1/')
+        pw=1920
+        ph=1080
+    else
+        echo "note: no 1920x1080 mode on $internal; falling back to native (expect side bars)" >&2
+        panel_mode=native
+    fi
+fi
+[[ $panel_mode == native ]] && prate=$(jq -r --arg n "$internal" '.[]|select(.name==$n)|.refreshRate' <<<"$mons")
+
+panel_scale=$(clean_scale "$panel_scale" "$pw" "$ph")
+
+read -r dw dh drate <<<"$(jq -r --arg n "$desktop" '.[]|select(.name==$n)|"\(.width) \(.height) \(.refreshRate)"' <<<"$mons")"
+[[ -n $desktop_scale ]] || desktop_scale=$(auto_scale "$dw")
+desktop_scale=$(clean_scale "$desktop_scale" "$dw" "$dh")
+
+read -r mw mh mrate <<<"$(jq -r --arg n "$mirror" '.[]|select(.name==$n)|"\(.width) \(.height) \(.refreshRate)"' <<<"$mons")"
+
+logical() { awk -v a="$1" -v b="$2" 'BEGIN{printf "%d", int(a/b)}'; }
+p_lw=$(logical "$pw" "$panel_scale")
+p_lh=$(logical "$ph" "$panel_scale")
+d_lw=$(logical "$dw" "$desktop_scale")
+d_lh=$(logical "$dh" "$desktop_scale")
+
+# The desktop sits in front of the laptop -> above it in screen coordinates.
+case "$position" in
+above)
+    dx=0
+    dy=0
+    px=$(((d_lw - p_lw) / 2))
+    py=$d_lh
+    ;;
+below)
+    dx=0
+    dy=$p_lh
+    px=$(((d_lw - p_lw) / 2))
+    py=0
+    ;;
+left)
+    dx=0
+    dy=0
+    px=$d_lw
+    py=0
+    ;;
+right)
+    px=0
+    py=0
+    dx=$p_lw
+    dy=0
+    ;;
+esac
+((px < 0)) && px=0
+((dx < 0)) && dx=0
+
+# --- build the profile -------------------------------------------------------
+
+out_json() { # name x y scale enabled mirror_of
+    local n="$1" x="$2" y="$3" sc="$4" mir="${5:-}"
+    jq -c --arg n "$n" --argjson x "$x" --argjson y "$y" --argjson sc "$sc" \
+        --arg mir "$mir" --arg mode "$6" --argjson w "$7" --argjson h "$8" --argjson r "$9" '
+    .[] | select(.name == $n) |
+    ([(.make), (.model)] + (if (.serial // "") == "" then [] else [(.serial)] end)
+      | map(ascii_downcase) | join("|")) as $key |
+    {
+      key: $key, match_key: $key,
+      name: .name, description: .description, make: .make, model: .model
+    }
+    + (if (.serial // "") == "" then {} else {serial: .serial} end)
+    + {
+      enabled: true, mode: $mode, width: $w, height: $h, refresh: $r,
+      x: $x, y: $y, scale: $sc, transform: 0, bitdepth: 8, cm: "srgb",
+      sdr_brightness: 1, sdr_saturation: 1, min_luminance: 0
+    }
+    + (if $mir == "" then {} else {mirror_of: $mir} end)
+  ' <<<"$mons"
+}
+
+prate_i=${prate%.*}
+drate_i=${drate%.*}
+mrate_i=${mrate%.*}
+
+o_desktop=$(out_json "$desktop" "$dx" "$dy" "$desktop_scale" "" "${dw}x${dh}@${drate_i}.00Hz" "$dw" "$dh" "$drate_i")
+o_panel=$(out_json "$internal" "$px" "$py" "$panel_scale" "" "${pw}x${ph}@${prate_i}.00Hz" "$pw" "$ph" "$prate_i")
+o_mirror=$(out_json "$mirror" "$px" "$py" 1 "$internal" "${mw}x${mh}@${mrate_i}.00Hz" "$mw" "$mh" "$mrate_i")
+
+if ((dry_run)); then
+    echo "DRY RUN -- nothing written, nothing applied."
+    printf '  %-8s %-22s %sx%s scale %s at %sx%s\n' "desktop" "$desktop" "$dw" "$dh" "$desktop_scale" "$dx" "$dy"
+    printf '  %-8s %-22s %sx%s scale %s at %sx%s\n' "laptop" "$internal" "$pw" "$ph" "$panel_scale" "$px" "$py"
+    printf '  %-8s %-22s mirrors %s\n' "mirror" "$mirror" "$internal"
+    echo "profile JSON:"
+    jq -n --argjson a "$o_desktop" --argjson b "$o_panel" --argjson c "$o_mirror" \
+        '{outputs: [$a, $b, $c]}'
+    exit 0
+fi
+
+target="$PROFILES/$name.json"
+if [[ -e $target && $force -eq 0 ]]; then
+    read -rp "Profile '$name' exists. Overwrite? [y/N] " a
+    [[ ${a,,} == y ]] || {
+        echo "aborted"
+        exit 0
+    }
+fi
+
+now=$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)
+jq -n --argjson a "$o_desktop" --argjson b "$o_panel" --argjson c "$o_mirror" \
+    --arg name "$name" --arg now "$now" '
+  {
+    name: $name, created_at: $now, updated_at: $now,
+    outputs: [$a, $b, $c],
+    workspaces: {
+      enabled: true, strategy: "manual", max_workspaces: 9, group_size: 3,
+      monitor_order: [$a.key, $b.key, $c.key],
+      rules: [{workspace:"1",output_key:""},{workspace:"2",output_key:""},{workspace:"3",output_key:""}]
+    },
+    exec: ""
+  }' >"$target.tmp" && jq -e . "$target.tmp" >/dev/null || die "failed to build profile JSON"
+mv "$target.tmp" "$target"
+rm -f "$PROFILES/$name.conf" "$PROFILES/$name.lua" # stale generated siblings
+
+echo "profile '$name' written:"
+printf '  %-8s %-22s %sx%s scale %s at %sx%s\n' "desktop" "$desktop" "$dw" "$dh" "$desktop_scale" "$dx" "$dy"
+printf '  %-8s %-22s %sx%s scale %s at %sx%s\n' "laptop" "$internal" "$pw" "$ph" "$panel_scale" "$px" "$py"
+printf '  %-8s %-22s mirrors %s\n' "mirror" "$mirror" "$internal"
+
+hyprmoncfg apply "$name" --confirm-timeout 0 >/dev/null 2>&1 || die "apply failed for '$name'"
+echo "applied."
+sleep 2
+
+# --- verify ------------------------------------------------------------------
+
+echo "result:"
+hyprctl monitors -j | jq -r '.[] | "  \(.name) \(.width)x\(.height) scale=\(.scale) at \(.x)x\(.y) mirror=\(.mirrorOf // "-")"'
+
+actual_mirror=$(hyprctl monitors -j | jq -r --arg n "$mirror" '.[]|select(.name==$n)|.mirrorOf // ""')
+if [[ -z $actual_mirror || $actual_mirror == "none" ]]; then
+    echo
+    echo "WARNING: $mirror did not come up as a mirror of $internal." >&2
+    echo "Check the generated rule:  cat ~/.config/hypr/hyprmoncfg-monitors.lua" >&2
+    echo "If 'mirror' is missing there, this hyprmoncfg build does not persist" >&2
+    echo "mirror_of in profiles; fall back to Omarchy's toggle:" >&2
+    echo "  omarchy hyprland monitor internal mirror on" >&2
+else
+    echo "  mirror confirmed: $mirror follows $internal"
+fi
