@@ -20,7 +20,7 @@
 # Re-runnable. Give each room its own --name; hyprmoncfg keys profiles on EDID
 # identity, so returning to a room auto-matches the profile saved there.
 #
-# Invoke: ~/Developer/bin/hypr-present
+# Invoke: ~/Developer/bin/omarchy/hypr-present
 
 set -uo pipefail
 
