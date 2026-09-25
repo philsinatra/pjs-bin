@@ -1,0 +1,69 @@
+{
+  "extends": [
+    "stylelint-config-standard",
+    "stylelint-config-recommended",
+    "stylelint-config-alphabetical-order",
+    "stylelint-config-html"
+  ],
+  "customSyntax": "postcss-html",
+  "plugins": [
+    "stylelint-value-no-unknown-custom-properties",
+    "stylelint-order"
+  ],
+  "overrides": [
+    {
+      "files": ["**/*.svelte"],
+      "customSyntax": "postcss-html"
+    },
+    {
+      "files": ["**/*.css"],
+      "customSyntax": "postcss"
+    }
+  ],
+  "rules": {
+    "alpha-value-notation": "number",
+    "color-named": "never",
+    "comment-empty-line-before": [
+      "never",
+      {
+        "ignore": ["after-comment", "stylelint-commands"],
+        "ignoreComments": ["#endregion", "/#region/"]
+      }
+    ],
+    "csstools/value-no-unknown-custom-properties": [
+      true,
+      {
+        "importFrom": ["./src/css/screen.css"]
+      }
+    ],
+    "custom-property-pattern": [
+      "^([a-z][a-z0-9]*)(-[a-z0-9]+)*$",
+      {
+        "message": "Expected custom property name to be kebab-case"
+      }
+    ],
+    "declaration-property-value-disallowed-list": {
+      "background-color": ["/^(?!var\\(--).+/"],
+      "border-color": ["/^(?!var\\(--).+/"],
+      "border-top-color": ["/^(?!var\\(--).+/"],
+      "border-right-color": ["/^(?!var\\(--).+/"],
+      "border-bottom-color": ["/^(?!var\\(--).+/"],
+      "border-left-color": ["/^(?!var\\(--).+/"],
+      "color": ["/^(?!var\\(--).+/"]
+    },
+    "declaration-property-value-no-unknown": [
+      true,
+      {
+        "ignoreProperties": { "grid-area": "/.+/" }
+      }
+    ],
+    "font-family-no-missing-generic-family-keyword": null,
+    "import-notation": "string",
+    "value-keyword-case": [
+      "lower",
+      {
+        "ignoreKeywords": ["Geist", "GeistMono", "Arial"]
+      }
+    ]
+  }
+}

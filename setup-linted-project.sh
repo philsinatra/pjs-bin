@@ -10,6 +10,12 @@ npm_version=$(npm -v 2>/dev/null) || {
     echo "🚫 NPM is not installed."
     exit 1
 }
+config_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")/configs"
+if [ ! -d "$config_dir" ]; then
+    echo "🚫 Config directory not found: $config_dir"
+    exit 1
+fi
+
 initial_pwd=$(pwd)
 project_pwd="$HOME/z-tmp"
 project_name="my_project"
@@ -49,27 +55,27 @@ else
         stylelint-value-no-unknown-custom-properties stylelint-order
 fi
 
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/oxlintrc.json -o .oxlintrc.json
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
-curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o styles.css
+cp "$config_dir/oxlintrc.json" .oxlintrc.json
+cp "$config_dir/.htmlhintrc" .htmlhintrc
+cp "$config_dir/.stylelintrc.json" .stylelintrc.json
+cp "$config_dir/css-starter.css" styles.css
 
 if [[ ${fmt_response:0:1} =~ ^[Pp]$ ]]; then
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.prettierrc -o .prettierrc
+    cp "$config_dir/.prettierrc" .prettierrc
 else
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.oxfmtrc.json -o .oxfmtrc.json
+    cp "$config_dir/.oxfmtrc.json" .oxfmtrc.json
 fi
 
-if [[ ${fmt_response:0:1} =~ ^[Oo]$ ]]; then
+if [[ ! ${fmt_response:0:1} =~ ^[Pp]$ ]]; then
     npm pkg set scripts.format="oxfmt"
     npm pkg set scripts.format:check="oxfmt --check"
     jq '. + {"lint-staged": {"*": "oxfmt --no-error-on-unmatched-pattern"}}' package.json >temp.json && mv temp.json package.json
 fi
 
 if jq . .stylelintrc.json >/dev/null 2>&1; then
-    jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./styles.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json""
+    jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./styles.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json
 else
-    echo "Error: .stylelintrc.json is not valie JSON"
+    echo "Error: .stylelintrc.json is not valid JSON"
     exit 1
 fi
 
@@ -79,9 +85,25 @@ read -p "🐘 Include PHP config? [Y/n] " response
 response=${response:-Y}
 
 if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.php-cs-fixer.php -o .php-cs-fixer.php
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/phpcs.xml -o phpcs.xml
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/composer.json -o composer.json
+    cp "$config_dir/.php-cs-fixer.php" .php-cs-fixer.php
+    cp "$config_dir/phpcs.xml" phpcs.xml
+    cp "$config_dir/composer.json" composer.json
+
+    # Formats the HTML in PHP templates (nvim runs html-beautify before php-cs-fixer)
+    npm install --save-dev --save-exact js-beautify
+    cat >.jsbeautifyrc <<'EOF'
+{
+  "html": {
+    "templating": ["php"],
+    "indent_size": 4,
+    "indent_char": " ",
+    "indent_inner_html": true,
+    "extra_liners": [],
+    "wrap_line_length": 100,
+    "end_with_newline": true
+  }
+}
+EOF
 
     mv index.html index.php
 
@@ -99,7 +121,7 @@ response=${response:-N}
 if [[ ${response:0:1} =~ ^[Yy]$ ]]; then
     vscode_workspace_file="$project_name.code-workspace"
     echo "🔧 Creating VSCode workspace file: $vscode_workspace_file"
-    curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/project.code-workspace
+    cp "$config_dir/project.code-workspace" "$vscode_workspace_file"
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
         open "$vscode_workspace_file" 2>/dev/null || echo "⚠️ Could not open VSCode workspace (macOS-specific command)"

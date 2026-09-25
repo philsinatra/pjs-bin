@@ -11,6 +11,12 @@ npm_version=$(npm -v 2>/dev/null) || {
     exit 1
 }
 
+config_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")/configs"
+if [ ! -d "$config_dir" ]; then
+    echo "🚫 Config directory not found: $config_dir"
+    exit 1
+fi
+
 initial_pwd=$(pwd)
 project_pwd="$HOME/z-tmp"
 project_name="my_svelte_project"
@@ -20,11 +26,18 @@ if [ -d "$project_pwd/$project_name" ]; then
     exit 1
 fi
 
-cd $project_pwd
+mkdir -p "$project_pwd"
+cd "$project_pwd" || {
+    echo "🚫 Failed to change to $project_pwd"
+    exit 1
+}
 
-npx sv create $project_name
+npx sv create "$project_name"
 
-cd $project_name
+cd "$project_name" || {
+    echo "🚫 Failed to change to $project_pwd/$project_name"
+    exit 1
+}
 
 npm install --save-dev --save-exact \
     postcss postcss-html \
@@ -32,20 +45,20 @@ npm install --save-dev --save-exact \
     stylelint-config-standard stylelint-config-alphabetical-order \
     stylelint-value-no-unknown-custom-properties stylelint-order
 
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.htmlhintrc -o .htmlhintrc
-curl -L https://gist.githubusercontent.com/philsinatra/3f1bd2e1cb2a4d4408318697400085fe/raw/.stylelintrc.json -o .stylelintrc.json
-curl -L https://gist.githubusercontent.com/philsinatra/79a52c69107d7fa899b88aea25f7f295/raw/css-starter.css -o ./src/lib/screen.css
+cp "$config_dir/.htmlhintrc" .htmlhintrc
+cp "$config_dir/.stylelintrc.json" .stylelintrc.json
+cp "$config_dir/css-starter.css" ./src/lib/screen.css
 
 git init
 
 if jq . .stylelintrc.json >/dev/null 2>&1; then
-    jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./src/lib/screen.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json""
+    jq '.rules["csstools/value-no-unknown-custom-properties"][1].importFrom = ["./src/lib/screen.css"]' .stylelintrc.json >temp.json && mv temp.json .stylelintrc.json
 else
-    echo "Error: .stylelintrc.json is not valie JSON"
+    echo "Error: .stylelintrc.json is not valid JSON"
     exit 1
 fi
 
-echo "Project setup complete: $project_pwd/$projct_name"
+echo "Project setup complete: $project_pwd/$project_name"
 
 cd "$initial_pwd" || {
     echo "🚫 Failed to return to $initial_pwd"
