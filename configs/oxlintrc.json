@@ -17,6 +17,7 @@
 		"no-ternary": "off",
 		"one-var": "off",
 		"func-style": "off",
+        "id-length": ["warn", { "exceptions": ["i"] }],
 		"init-declarations": "off",
 		"no-magic-numbers": "off",
 		"max-statements": "off",
