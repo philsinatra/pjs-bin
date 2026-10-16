@@ -35,7 +35,7 @@ cd "$project_pwd/$project_name" || {
 }
 touch index.html main.js
 
-npm init -y >/dev/null
+npm init -y --init-type=module >/dev/null
 if [[ ${fmt_response:0:1} =~ ^[Pp]$ ]]; then
     npm install --save-dev --save-exact \
         prettier \
